@@ -74,55 +74,16 @@ public class Main {
             CountDownLatch latch = new CountDownLatch(3);
             ExecutorService executor = Executors.newFixedThreadPool(3);
 
-            Callable<double[][]> task1 = () -> {
-                double[][] r = operations.multiplyMatrix(MM, operations.subtractMatrix(ME, MX));
-                lock.lock();
-                try {
-                    for (int i = 0; i < r.length; i++) {
-                        System.arraycopy(r[i], 0, result1[i], 0, r[i].length);
-                    }
-                    System.out.println("\nResult 1: " + Arrays.deepToString(r));
-                    writer.println("\nResult 1: " + Arrays.deepToString(result1));
-                } finally {
-                    lock.unlock();
-                }
-                latch.countDown();
-                return r;
-            };
+            ForkJoinPool pool = new ForkJoinPool();
 
-            Callable<double[][]> task2 = () -> {
-                double[][] r = operations.multiplyMatrixByScalar(operations.multiplyMatrix(ME, MX), q);
-                lock.lock();
-                try {
-                    for (int i = 0; i < r.length; i++) {
-                        System.arraycopy(r[i], 0, result2[i], 0, r[i].length);
-                    }
-                    System.out.println("\nResult 2: " + Arrays.deepToString(r));
-                    writer.println("\nResult 2: " + Arrays.deepToString(result2));
-                } finally {
-                    lock.unlock();
-                }
-                latch.countDown();
-                return r;
-            };
+            Task1 task1 = (Task1) Task1.createTask(operations, MM, ME, MX, result1, writer, lock, latch);
+            result1 = pool.invoke(task1);
 
-            Callable<double[]> task3 = () -> {
-                double[] r = operations.multiplyVectorByScalar(D, operations.findMinValue(B));
-                lock.lock();
-                try {
-                    System.arraycopy(r, 0, result3, 0, r.length);
-                    System.out.println("\nResult 3: " + Arrays.toString(r));
-                    writer.println("\nResult 3: " + Arrays.toString(result3));
-                } finally {
-                    lock.unlock();
-                }
-                latch.countDown();
-                return r;
-            };
+            Task2 task2 = (Task2) Task2.createTask(operations, ME, MX, q, result2, writer, lock, latch);
+            result2 = pool.invoke(task2);
 
-            Future<double[][]> future1 = executor.submit(task1);
-            Future<double[][]> future2 = executor.submit(task2);
-            Future<double[]> future3 = executor.submit(task3);
+            Task3 task3 = (Task3) Task3.createTask(operations, D, B, result3, writer, lock, latch);
+            result3 = pool.invoke(task3);
 
             try {
                 latch.await();
